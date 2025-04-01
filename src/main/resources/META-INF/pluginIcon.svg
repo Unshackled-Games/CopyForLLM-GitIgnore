@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+    <!-- Clipboard Back -->
+    <rect x="3" y="1" width="10" height="14" rx="1.5" fill="#CED0D6"/>
+    <!-- Clip Part -->
+    <path d="M6,1.5 L6,3 L10,3 L10,1.5 C10,0.9 9.1,0.5 8.5,0.5 L7.5,0.5 C6.9,0.5 6,0.9 6,1.5 Z" fill="#6C707E"/>
+    <!-- Text "LLM" -->
+    <text x="8" y="10.5" font-family="Arial, sans-serif" font-size="6" font-weight="bold" text-anchor="middle"
+          fill="#333333">LLM
+    </text>
+</svg>

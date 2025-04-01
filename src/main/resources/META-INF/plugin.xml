@@ -1,0 +1,45 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.aykoo.copyforllm</id>
+    <name>CopyForLlm</name>
+    <version>1.0.0</version>
+    <vendor url="https://github.com/AykoSc/copyforllm">Aykoo</vendor>
+    <description><![CDATA[
+    Copies selected files and folders structure and content to the clipboard, formatted for easy pasting into Large Language Models (LLMs).<br>
+    <em>Features:</em>
+    <ul>
+        <li>Generates a file tree of the selection relative to the project root.</li>
+        <li>Includes file content with language-specific comment headers showing project-relative paths.</li>
+        <li>Skips binary and empty file content but includes them in the tree/header.</li>
+    </ul>
+    Right-click on files/folders in the Project view and select "Copy for LLM".
+    ]]></description>
+    <change-notes><![CDATA[
+    <em>1.0.0</em>
+    <ul>
+        <li>Initial release of CopyForLlm.</li>
+        <li>Copies selected file/folder structure and content to clipboard.</li>
+        <li>Formats output with tree structure and file content headers for LLMs.</li>
+        <li>Handles basic language comment styles.</li>
+        <li>Skips binary/empty files.</li>
+    </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="CopyForLLMNotifications" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <action id="com.aykoo.copyforllm.CopyAction"
+                class="com.aykoo.copyforllm.CopyForLlmAction"
+                text="Copy for LLM"
+                description="Copy structure and content for LLM input"
+                icon="AllIcons.Actions.Copy"> <!-- Default icon for action, distinct plugin icon set above -->
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+
+</idea-plugin>
