@@ -15,6 +15,13 @@
     Right-click on files/folders in the Project view and select "Copy for LLM".
     ]]></description>
     <change-notes><![CDATA[
+    <em>1.0.1</em>
+     <ul>
+         <li>Added character count to clipboard copy notification.</li>
+         <li>Updated compatibility range.</li>
+         <li>Fixed internal API usage warning.</li>
+     </ul>
+     <br/>
     <em>1.0.0</em>
     <ul>
         <li>Initial release of CopyForLlm.</li>
