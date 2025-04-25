@@ -4,7 +4,10 @@ import com.intellij.ide.projectView.ProjectViewNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ide.CopyPasteManager
@@ -154,12 +157,6 @@ class CopyForLlmAction : AnAction() {
                 is VirtualFile -> virtualFile = value
             }
         }
-
-        // 5. Check if it provides data via DataProvider interface
-        if (virtualFile == null && navigatable is DataProvider) {
-            virtualFile = navigatable.getData(CommonDataKeys.VIRTUAL_FILE.name) as? VirtualFile
-        }
-        // --- End of Generic Resolution Logic ---
 
         if (virtualFile == null) {
             logger.warn("Could not resolve VirtualFile for Navigatable type: ${navigatable.javaClass.name}")
