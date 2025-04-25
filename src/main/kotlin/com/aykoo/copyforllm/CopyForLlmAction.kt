@@ -96,11 +96,14 @@ class CopyForLlmAction : AnAction() {
 
                     // Copying to clipboard must happen on the EDT
                     ApplicationManager.getApplication().invokeLater {
-                        CopyPasteManager.getInstance().setContents(StringSelection(result.clipboardContent))
+                        val contentToCopy = result.clipboardContent
+                        val charCount = contentToCopy.length
+
+                        CopyPasteManager.getInstance().setContents(StringSelection(contentToCopy))
                         showNotification(
                             project,
                             NotificationType.INFORMATION,
-                            "Copied ${result.fileCount} files (${result.skippedCount} skipped) to clipboard."
+                            "Copied ${result.fileCount} files (${result.skippedCount} skipped, ${charCount} characters) to clipboard."
                         )
                     }
                 } catch (ex: Exception) { // Catch generic exceptions during the process
