@@ -1,5 +1,10 @@
 package com.unshackledgames.copyforllmplus
 
+import com.intellij.openapi.components.service
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFileVisitor
+import com.unshackledgames.copyforllmplus.CopyForLLMSettings
 import com.intellij.ide.projectView.ProjectViewNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.notification.NotificationGroupManager
@@ -61,44 +66,42 @@ class CopyForLLMPlusAction : AnAction() {
         // navigatables.forEachIndexed { index, nav ->
         //    logger.info("Navigatable[$index]: Type=${nav?.javaClass?.name ?: "null"}, Value=${nav}")
         // }
-        val settings = ServiceManager
-            .getService(CopyForLLMSettings::class.java)
-        val excludedExts = settings
+        // 1) grab the user’s excluded‐extensions list
+        val settings = service<CopyForLLMSettings>()
+        val excludedExts: Set<String> = settings
             .getExcludedExtensionsList()
             .toSet()
 
-        val selectedFiles = navigatables.mapNotNull { navigatable ->
-            resolveVirtualFile(navigatable) // Use helper function for clarity
-        }.distinct().toTypedArray()
+// 2) your original resolution, but as a var so we can reassign it
+        var selectedFiles = navigatables
+            .mapNotNull { resolveVirtualFile(it) }
+            .distinct()
+            .toTypedArray()
 
-
-// 3) Expand directories into their files
-//    and keep standalone files
-        val allFiles: List<VirtualFile> = selectedFiles.flatMap { vf ->
+// 3) recurse into any directories, collect every file
+        val allFiles = mutableListOf<VirtualFile>()
+        selectedFiles.forEach { vf ->
             if (vf.isDirectory) {
-                val files = mutableListOf<VirtualFile>()
-                VfsUtilCore.visitChildrenRecursively(vf, object : VirtualFileVisitor<Any>() {
+                VfsUtilCore.visitChildrenRecursively(vf, object : VirtualFileVisitor<Any?>() {
                     override fun visitFile(file: VirtualFile): Boolean {
-                        files += file
+                        allFiles += file
                         return true
                     }
                 })
-                files
             } else {
-                listOf(vf)
+                allFiles += vf
             }
         }
 
-// 4) Filter out directories *and* excluded extensions
+// 4) filter out directories + any file whose extension is in excludedExts
         selectedFiles = allFiles
             .asSequence()
-            .filter { !it.isDirectory }                  // drop any directories
+            .filter { !it.isDirectory }
             .filter { file ->
-                // keep if no extension OR ext not in excludedExts
                 file.extension
                     ?.lowercase()
                     ?.let { it !in excludedExts }
-                    ?: true
+                    ?: true   // keep files with no “.” in their name
             }
             .distinct()
             .toList()
