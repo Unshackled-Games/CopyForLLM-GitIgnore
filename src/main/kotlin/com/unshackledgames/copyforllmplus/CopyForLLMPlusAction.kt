@@ -61,10 +61,48 @@ class CopyForLLMPlusAction : AnAction() {
         // navigatables.forEachIndexed { index, nav ->
         //    logger.info("Navigatable[$index]: Type=${nav?.javaClass?.name ?: "null"}, Value=${nav}")
         // }
+        val settings = ServiceManager
+            .getService(CopyForLLMSettings::class.java)
+        val excludedExts = settings
+            .getExcludedExtensionsList()
+            .toSet()
 
         val selectedFiles = navigatables.mapNotNull { navigatable ->
             resolveVirtualFile(navigatable) // Use helper function for clarity
         }.distinct().toTypedArray()
+
+
+// 3) Expand directories into their files
+//    and keep standalone files
+        val allFiles: List<VirtualFile> = selectedFiles.flatMap { vf ->
+            if (vf.isDirectory) {
+                val files = mutableListOf<VirtualFile>()
+                VfsUtilCore.visitChildrenRecursively(vf, object : VirtualFileVisitor<Any>() {
+                    override fun visitFile(file: VirtualFile): Boolean {
+                        files += file
+                        return true
+                    }
+                })
+                files
+            } else {
+                listOf(vf)
+            }
+        }
+
+// 4) Filter out directories *and* excluded extensions
+        selectedFiles = allFiles
+            .asSequence()
+            .filter { !it.isDirectory }                  // drop any directories
+            .filter { file ->
+                // keep if no extension OR ext not in excludedExts
+                file.extension
+                    ?.lowercase()
+                    ?.let { it !in excludedExts }
+                    ?: true
+            }
+            .distinct()
+            .toList()
+            .toTypedArray()
 
         logger.info("Resolved ${selectedFiles.size} distinct VirtualFiles from ${navigatables.size} Navigatables.")
         // Optional: Log resolved files
