@@ -8,9 +8,10 @@ import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
 
 @State(
-    name = "CopyForLLMSettings",
-    storages = [Storage("CopyForLLMSettings.xml")]
+    name = "CopyForLLMPlusSettings",
+    storages = [Storage("copyforllmplus.xml")]
 )
+@Service(Service.Level.APP)
 class CopyForLLMSettings : PersistentStateComponent<CopyForLLMSettings.State> {
     data class State(var excludedExtensions: String = "")
 

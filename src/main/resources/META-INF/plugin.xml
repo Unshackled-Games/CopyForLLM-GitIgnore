@@ -31,6 +31,9 @@
                 instance="com.unshackledgames.copyforllmplus.CopyForLLMConfigurable"
                 groupId="tools"
                 helpTopic="com.unshackledgames.copyforllmplus.settings"/>
+        <applicationService
+                serviceInterface="com.unshackledgames.copyforllmplus.CopyForLLMSettings"
+                serviceImplementation="com.unshackledgames.copyforllmplus.CopyForLLMSettings"/>
     </extensions>
 
     <actions>
