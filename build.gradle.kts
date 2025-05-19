@@ -4,8 +4,8 @@ plugins {
     id("org.jetbrains.intellij") version "1.17.4"
 }
 
-group = "com.aykoo"
-version = "1.0.1"
+group = "com.unshackled-games"
+version = "1.0.0"
 
 repositories {
     mavenCentral()

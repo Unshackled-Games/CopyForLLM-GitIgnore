@@ -1,6 +1,6 @@
 forked from [AykoSc/copyforllm](https://github.com/AykoSc/copyforllm)
 
-# Copy for LLM JetBrains Plugin
+# Copy for LLM Plus JetBrains Plugin
 
 Copies selected project file structure and content to the clipboard, formatted for pasting into Large Language Models (
 LLMs).
@@ -15,3 +15,4 @@ each preceded by a header comment indicating its path relative to the project ro
 # Caveats
 
 Only tested with IntelliJ. Other JetBrains IDEs should work, but are not guaranteed to be supported.
+

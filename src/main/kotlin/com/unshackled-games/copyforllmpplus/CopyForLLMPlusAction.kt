@@ -1,5 +1,3 @@
-package com.aykoo.copyforllm
-
 import com.intellij.ide.projectView.ProjectViewNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.notification.NotificationGroupManager
@@ -25,9 +23,9 @@ import com.intellij.openapi.vcs.FileStatusManager
 import com.intellij.openapi.vcs.FileStatus
 
 
-class CopyForLlmAction : AnAction() {
+class CopyForLLMPlusAction : AnAction() {
 
-    private val logger = Logger.getInstance(CopyForLlmAction::class.java)
+    private val logger = Logger.getInstance(CopyForLLMPlusAction::class.java)
     private val notificationGroupId = "CopyForLLMNotifications"
 
     /**

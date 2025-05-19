@@ -1,5 +1,3 @@
-package com.aykoo.copyforllm
-
 import com.intellij.lang.Commenter
 import com.intellij.lang.LanguageCommenters
 import com.intellij.lang.LanguageUtil

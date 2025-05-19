@@ -1,8 +1,8 @@
 pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
+        repositories {
+                mavenCentral()
+                gradlePluginPortal()
+            }
     }
-}
 
-rootProject.name = "copyforllm"
+rootProject.name = "copyforllm-plus"

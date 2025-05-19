@@ -1,36 +1,19 @@
-<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>com.aykoo.copyforllm</id>
-    <name>CopyForLlm</name>
+    <id>com.unshackled-games.copyforllmplus</id>
+    <name>Copy for LLM Plus</name>
     <version>1.0.0</version>
-    <vendor url="https://github.com/AykoSc/copyforllm">Aykoo</vendor>
+    <vendor url="https://github.com/Unshackled-Games/CopyForLLM-GitIgnore">Unshackled-Games</vendor>
     <description><![CDATA[
-    Copies selected files and folders structure and content to the clipboard, formatted for easy pasting into Large Language Models (LLMs).<br>
-    <em>Features:</em>
+    Iteration of the original Copy for LLM plugin, now offering enhanced control over formatting, language annotations, and output customization for seamless integration with modern LLMs.<br>
+    <em>Enhanced Features:</em>
     <ul>
-        <li>Generates a file tree of the selection relative to the project root.</li>
-        <li>Includes file content with language-specific comment headers showing project-relative paths.</li>
-        <li>Skips binary and empty file content but includes them in the tree/header.</li>
+        <li>Customizable output formats: Markdown, JSON, or plain text.</li>
+        <li>Language &amp; syntax metadata to boost LLM context understanding.</li>
+        <li>Advanced file-filter settings with binary-file detection.</li>
+        <li>Integration presets for ChatGPT, Anthropic, and more.</li>
     </ul>
-    Right-click on files/folders in the Project view and select "Copy for LLM".
+    Right-click on files/folders in the Project view and select "Copy for LLM Plus".
     ]]></description>
-    <change-notes><![CDATA[
-    <em>1.0.1</em>
-     <ul>
-         <li>Added character count to clipboard copy notification.</li>
-         <li>Updated compatibility range.</li>
-         <li>Fixed internal API usage warning.</li>
-     </ul>
-     <br/>
-    <em>1.0.0</em>
-    <ul>
-        <li>Initial release of CopyForLlm.</li>
-        <li>Copies selected file/folder structure and content to clipboard.</li>
-        <li>Formats output with tree structure and file content headers for LLMs.</li>
-        <li>Handles basic language comment styles.</li>
-        <li>Skips binary/empty files.</li>
-    </ul>
-    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
@@ -44,14 +27,14 @@
                 display-type="BALLOON"
                 log-by-default="false"/>
     </notifications>
+
     <actions>
-        <action id="com.aykoo.copyforllm.CopyAction"
-                class="com.aykoo.copyforllm.CopyForLlmAction"
-                text="Copy for LLM"
-                description="Copy structure and content for LLM input"
-                icon="AllIcons.Actions.Copy"> <!-- Default icon for action, distinct plugin icon set above -->
+        <action id="com.Unshackled-Games.copyforllmplus.CopyAction"
+                class="com.Unshackled-Games.copyforllmplus.CopyForLLMPlusAction"
+                text="Copy for LLM Plus"
+                description="Copy project structure and content for LLM prompts with enhanced options"
+                icon="AllIcons.Actions.Copy">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
     </actions>
-
 </idea-plugin>
