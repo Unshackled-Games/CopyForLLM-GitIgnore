@@ -1,5 +1,6 @@
 package com.unshackledgames.copyforllmplus
 
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -26,10 +27,10 @@ import java.util.regex.Pattern
 
 class CopyForLLMPlusAction : AnAction() {
 
-    private val logger = Logger.getInstance(CopyForLlmAction::class.java)
+    private val logger = Logger.getInstance(CopyForLLMPlusAction::class.java)
     private val notificationGroupId = "CopyForLLMNotifications"
 
-    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 
     override fun update(e: AnActionEvent) {
         val project = e.project
