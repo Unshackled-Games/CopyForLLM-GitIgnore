@@ -24,7 +24,7 @@ import com.intellij.pom.Navigatable
 import java.awt.datatransfer.StringSelection
 import java.util.regex.Pattern
 
-class CopyForLlmAction : AnAction() {
+class CopyForLLMPlusAction : AnAction() {
 
     private val logger = Logger.getInstance(CopyForLlmAction::class.java)
     private val notificationGroupId = "CopyForLLMNotifications"
