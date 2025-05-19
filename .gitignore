@@ -40,3 +40,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+.run/                     # IntelliJ run configs (.run/)
+.idea/workspace.xml       # IDE workspace (very frequently changes)
+.idea/tasks.xml           # IDE tasks
+*.log                     # any log files

@@ -20,13 +20,12 @@
     <depends>Git4Idea</depends>
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="CopyForLLMNotifications" displayType="BALLOON"/>
+        <projectConfigurable instance="com.unshackled-games.copyforllmplus.CopyForLLMConfigurable"/>
+        <notificationGroup
+                id="com.unshackledgames.copyforllmplus.notifications"
+                displayType="BALLOON"
+                isLogByDefault="true"/>
     </extensions>
-    <notifications>
-        <notification
-                group-id="CopyForLLMNotifications"
-                display-type="BALLOON"
-                log-by-default="false"/>
-    </notifications>
 
     <actions>
         <action id="com.Unshackled-Games.copyforllmplus.CopyAction"
