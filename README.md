@@ -1,4 +1,4 @@
-forked from AykoSc/copyforllm
+forked from [AykoSc/copyforllm](https://github.com/AykoSc/copyforllm)
 
 # Copy for LLM JetBrains Plugin
 
