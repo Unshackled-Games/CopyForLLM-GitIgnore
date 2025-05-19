@@ -1,3 +1,5 @@
+forked from AykoSc/copyforllm
+
 # Copy for LLM JetBrains Plugin
 
 Copies selected project file structure and content to the clipboard, formatted for pasting into Large Language Models (
