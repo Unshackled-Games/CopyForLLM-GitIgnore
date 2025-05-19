@@ -28,7 +28,7 @@ jobs:
 
       # 4. Upload the ZIP so you can download it from the Actions page
       - name: Upload plugin artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: copyforllm-plugin
           path: build/distributions/*.zip
