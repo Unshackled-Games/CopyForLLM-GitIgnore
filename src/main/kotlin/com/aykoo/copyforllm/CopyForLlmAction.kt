@@ -21,6 +21,8 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import java.awt.datatransfer.StringSelection
+import com.intellij.openapi.vcs.FileStatusManager
+import com.intellij.openapi.vcs.FileStatus
 
 
 class CopyForLlmAction : AnAction() {
@@ -66,11 +68,17 @@ class CopyForLlmAction : AnAction() {
             resolveVirtualFile(navigatable) // Use helper function for clarity
         }.distinct().toTypedArray()
 
-        logger.info("Resolved ${selectedFiles.size} distinct VirtualFiles from ${navigatables.size} Navigatables.")
+        val statusMgr = FileStatusManager.getInstance(project)
+        val toProcess = selectedFiles.filter { vf ->
+            statusMgr.getStatus(vf) != FileStatus.IGNORED
+        }.toTypedArray()
+
+        logger.info("Resolved ${toProcess.size} distinct VirtualFiles from ${navigatables.size} Navigatables.")
+
         // Optional: Log resolved files
         // selectedFiles.forEachIndexed { index, vf -> logger.debug("  Final VF[$index]: ${vf.path}") }
 
-        if (selectedFiles.isEmpty()) {
+        if (toProcess.isEmpty()) {
             logger.warn("Action performed but failed to resolve any VirtualFiles from the selected Navigatables.")
             showNotification(
                 project,
@@ -89,7 +97,7 @@ class CopyForLlmAction : AnAction() {
 
                 try {
                     val contentBuilder = LlmContentBuilder(project, indicator)
-                    val result = contentBuilder.buildContent(selectedFiles)
+                    val result = contentBuilder.buildContent(toProcess)
 
                     indicator.fraction = 1.0
                     indicator.text = "Copying to clipboard..."
