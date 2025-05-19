@@ -38,7 +38,12 @@
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="CopyForLLMNotifications" displayType="BALLOON"/>
     </extensions>
-
+    <notifications>
+        <notification
+                group-id="CopyForLLMNotifications"
+                display-type="BALLOON"
+                log-by-default="false"/>
+    </notifications>
     <actions>
         <action id="com.aykoo.copyforllm.CopyAction"
                 class="com.aykoo.copyforllm.CopyForLlmAction"
