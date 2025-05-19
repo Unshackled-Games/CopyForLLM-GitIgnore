@@ -25,15 +25,23 @@
                 id="com.unshackledgames.copyforllmplus.notifications"
                 displayType="BALLOON"
                 isLogByDefault="true"/>
+        <applicationConfigurable
+                id="com.unshackledgames.copyforllmplus.Settings"
+                displayName="Copy for LLM Plus"
+                instance="com.unshackledgames.copyforllmplus.CopyForLLMConfigurable"
+                groupId="tools"
+                helpTopic="com.unshackledgames.copyforllmplus.settings"/>
     </extensions>
 
     <actions>
-        <action id="com.Unshackled-Games.copyforllmplus.CopyAction"
-                class="com.Unshackled-Games.copyforllmplus.CopyForLLMPlusAction"
+        <action
+                id="com.unshackledgames.copyforllmplus.CopyForLLMPlus"
+                class="com.unshackledgames.copyforllmplus.CopyForLLMPlusAction"
                 text="Copy for LLM Plus"
-                description="Copy project structure and content for LLM prompts with enhanced options"
+                description="Copy project structure and content for LLM prompts"
                 icon="AllIcons.Actions.Copy">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu"      anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

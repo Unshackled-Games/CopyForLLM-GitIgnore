@@ -1,4 +1,4 @@
-package com.`unshackled-games`.copyforllmplus
+package com.unshackledgames.copyforllmplus
 
 import com.intellij.openapi.options.SearchableConfigurable
 import javax.swing.JComponent

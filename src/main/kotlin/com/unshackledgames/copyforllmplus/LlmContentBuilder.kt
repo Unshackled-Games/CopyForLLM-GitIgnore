@@ -1,4 +1,4 @@
-package com.`unshackled-games`.copyforllmplus
+package com.unshackledgames.copyforllmplus
 
 import com.intellij.lang.Commenter
 import com.intellij.lang.LanguageCommenters

@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.17.4"
 }
 
-group = "com.unshackled-games"
+group = "com.unshackledgames.copyforllmplus"
 version = "1.0.0"
 
 repositories {
