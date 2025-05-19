@@ -16,7 +16,7 @@ repositories {
 intellij {
     version.set("2024.1.7")
     type.set("IC") // Target IDE Platform
-    plugins.set(listOf("git4idea"))
+    plugins.set(listOf("Git4Idea"))
 }
 
 tasks {
