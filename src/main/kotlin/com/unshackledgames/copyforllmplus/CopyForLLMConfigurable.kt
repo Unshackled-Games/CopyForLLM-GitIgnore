@@ -20,7 +20,7 @@ class CopyForLLMConfigurable : SearchableConfigurable {
 
     private val settings get() = service<CopyForLLMSettings>()
 
-    private var root: JPanel? = null
+    private lateinit var root: JPanel
 
     private lateinit var rbInclude: JBRadioButton
     private lateinit var rbExclude: JBRadioButton
@@ -159,6 +159,5 @@ class CopyForLLMConfigurable : SearchableConfigurable {
     }
 
     override fun disposeUIResources() {
-        root = null
     }
 }
