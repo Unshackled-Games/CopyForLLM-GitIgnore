@@ -1,50 +1,71 @@
 <idea-plugin>
-    <id>com.unshackled-games.copyforllmplus</id>
+    <!-- ===== Identity ===== -->
+    <id>com.unshackledgames.copyforllmplus</id>
     <name>Copy for LLM Plus</name>
-    <version>1.0.0</version>
-    <vendor url="https://github.com/Unshackled-Games/CopyForLLM-GitIgnore">Unshackled-Games</vendor>
-    <description><![CDATA[
-    Iteration of the original Copy for LLM plugin, now offering enhanced control over formatting, language annotations, and output customization for seamless integration with modern LLMs.<br>
-    <em>Enhanced Features:</em>
-    <ul>
-        <li>Customizable output formats: Markdown, JSON, or plain text.</li>
-        <li>Language &amp; syntax metadata to boost LLM context understanding.</li>
-        <li>Advanced file-filter settings with binary-file detection.</li>
-        <li>Integration presets for ChatGPT, Anthropic, and more.</li>
-    </ul>
-    Right-click on files/folders in the Project view and select "Copy for LLM Plus".
-    ]]></description>
+    <version>1.1.0</version>
 
+    <!-- ===== Vendor info (edit as you like) ===== -->
+    <vendor email="contact@unshackled-games.com" url="https://unshackled-games.com">
+        Unshackled Games
+    </vendor>
+
+    <!-- ===== Compatibility =====
+         Adjust since-build if you target older/newer IDEs.
+         231 = 2023.1, 241 = 2024.1, 242 = 2024.2, etc.
+    -->
+    <idea-version since-build="231"/>
+
+    <!-- ===== Required platform modules ===== -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.lang</depends>
-    <depends>Git4Idea</depends>
+
+    <!-- ===== Description shown in Plugins UI ===== -->
+    <description><![CDATA[
+    <h2>Copy for LLM Plus</h2>
+    <p>
+      Collects selected project files and copies their contents to the clipboard for LLM use.
+      Supports <b>Include</b> and <b>Exclude</b> pattern lists with a toggle to switch modes.
+      The inactive list is automatically disabled (greyed out).
+    </p>
+    <ul>
+      <li>VFS-based file discovery (Project View, Editor, and recursive directories)</li>
+      <li>Robust fallbacks and safe defaults</li>
+      <li>Configurable in <i>Settings | Tools | Copy for LLM</i></li>
+    </ul>
+  ]]></description>
+
+    <!-- ===== Optional change notes ===== -->
+    <change-notes><![CDATA[
+    <ul>
+      <li>1.1.0 — Include/Exclude mode with two pattern lists, improved VFS file collection, notifications.</li>
+    </ul>
+  ]]></change-notes>
+
+    <!-- ===== Extensions ===== -->
     <extensions defaultExtensionNs="com.intellij">
-        <notificationGroup id="CopyForLLMNotifications" displayType="BALLOON"/>
-        <projectConfigurable instance="com.unshackled-games.copyforllmplus.CopyForLLMConfigurable"/>
+        <!-- Settings page (Application-level configurable) -->
+        <applicationConfigurable
+                id="preferences.copyForLLM"
+                displayName="Copy for LLM"
+                implementation="com.unshackledgames.copyforllmplus.CopyForLLMConfigurable"/>
+
+        <!-- Notification group used by actions -->
         <notificationGroup
-                id="com.unshackledgames.copyforllmplus.notifications"
+                id="CopyForLLM"
                 displayType="BALLOON"
                 isLogByDefault="true"/>
-        <applicationConfigurable
-                id="com.unshackledgames.copyforllmplus.Settings"
-                displayName="Copy for LLM Plus"
-                instance="com.unshackledgames.copyforllmplus.CopyForLLMConfigurable"
-                groupId="tools"
-                helpTopic="com.unshackledgames.copyforllmplus.settings"/>
-        <applicationService
-                serviceInterface="com.unshackledgames.copyforllmplus.CopyForLLMSettings"
-                serviceImplementation="com.unshackledgames.copyforllmplus.CopyForLLMSettings"/>
     </extensions>
 
+    <!-- ===== Actions ===== -->
     <actions>
-        <action
-                id="com.unshackledgames.copyforllmplus.CopyForLLMPlus"
-                class="com.unshackledgames.copyforllmplus.CopyForLLMPlusAction"
-                text="Copy for LLM Plus"
-                description="Copy project structure and content for LLM prompts"
-                icon="AllIcons.Actions.Copy">
+        <action id="CopyForLLM.CopySelected"
+                class="com.unshackledgames.copyforllmplus.CopyForLLMAction"
+                text="Copy for LLM"
+                description="Collect selected files and copy their contents for LLM use">
+            <!-- Show under Tools menu -->
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <!-- Also handy in editor/project popups (remove if you prefer it only in Tools) -->
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-            <add-to-group group-id="EditorPopupMenu"      anchor="last"/>
         </action>
     </actions>
 </idea-plugin>
