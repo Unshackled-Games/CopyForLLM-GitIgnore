@@ -1,0 +1,7 @@
+<idea-plugin>
+    <actions>
+        <reference ref="CopyForLLM.CopySelected">
+            <add-to-group group-id="SolutionExplorerPopupMenu" anchor="last"/>
+        </reference>
+    </actions>
+</idea-plugin>

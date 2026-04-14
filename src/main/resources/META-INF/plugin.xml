@@ -17,6 +17,8 @@
 
     <!-- ===== Required platform modules ===== -->
     <depends>com.intellij.modules.platform</depends>
+    <!-- Rider-specific actions/groups are registered via META-INF/rider.xml -->
+    <depends optional="true" config-file="rider.xml">com.intellij.modules.rider</depends>
 
     <!-- ===== Description shown in Plugins UI ===== -->
     <description><![CDATA[
