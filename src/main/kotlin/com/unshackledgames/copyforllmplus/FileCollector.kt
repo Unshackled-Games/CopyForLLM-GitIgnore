@@ -12,7 +12,7 @@ object FileCollector {
 
     /** Top-level entry: gather files from selection/editor, or fall back to entire project dir. */
     fun collectAllCandidateFiles(project: Project, dataContext: DataContext): List<VirtualFile> {
-        val selection = collectSelected(project, dataContext)
+        val selection = collectSelected(dataContext)
         if (selection.isNotEmpty()) return selection
 
         // Fallback: selected editor files
@@ -30,7 +30,7 @@ object FileCollector {
     }
 
     /** Get VirtualFiles from Project View selection (or empty). */
-    private fun collectSelected(project: Project, dataContext: DataContext): List<VirtualFile> {
+    private fun collectSelected(dataContext: DataContext): List<VirtualFile> {
         val arr = CommonDataKeys.VIRTUAL_FILE_ARRAY.getData(dataContext) ?: return emptyList()
         return expand(arr.toList())
     }
@@ -43,7 +43,7 @@ object FileCollector {
             if (vf.isDirectory) {
                 VfsUtilCore.iterateChildrenRecursively(
                     vf,
-                    { file -> file != null && file.isValid && shouldDescendInto(file) },
+                    { file -> file != null && file.isValid },
                     { child ->
                         if (child != null && child.isValid && !child.isDirectory) {
                             out.add(child)
@@ -56,13 +56,6 @@ object FileCollector {
             }
         }
         return out.toList()
-    }
-
-    /** Skip common heavy folders when recursing the project root. */
-    private fun shouldDescendInto(vf: VirtualFile): Boolean {
-        if (!vf.isDirectory) return true
-        val name = vf.name.lowercase()
-        return name !in setOf(".git", ".idea", "node_modules", "dist", "build", "out", "bin", "target", ".gradle")
     }
 
     /** Apply include/exclude logic from settings. */
