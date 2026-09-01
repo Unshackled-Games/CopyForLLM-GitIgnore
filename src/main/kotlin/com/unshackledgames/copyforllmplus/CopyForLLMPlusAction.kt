@@ -4,17 +4,29 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileTypes.UnknownFileType
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
+import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
+import java.io.BufferedWriter
+import java.io.File
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Base64
 
 class CopyForLLMAction : DumbAwareAction(
     "Copy for LLM",
@@ -41,121 +53,212 @@ class CopyForLLMAction : DumbAwareAction(
             return
         }
 
-        val result = ReadAction.compute<CopyBuildResult, RuntimeException> {
-            buildClipboardContent(project.basePath ?: "", filtered)
-        }
+        val basePath = project.basePath ?: ""
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Copying for LLM", true) {
+            override fun run(indicator: ProgressIndicator) {
+                try {
+                    val bundle = buildBundle(basePath, filtered, indicator)
+                    val payload = createClipboardPayload(bundle)
 
-        if (result.copiedCount == 0) {
-            notify(
-                project,
-                "No text files could be copied. ${formatSkipped(result)}",
-                NotificationType.WARNING
+                    ApplicationManager.getApplication().invokeLater {
+                        CopyPasteManager.getInstance().setContents(payload.transferable)
+                        payload.afterCopied()
+                        notify(project, formatSuccess(bundle, payload), NotificationType.INFORMATION)
+                    }
+                } catch (e: ProcessCanceledException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error("Copy for LLM failed.", e)
+                    ApplicationManager.getApplication().invokeLater {
+                        notify(
+                            project,
+                            "Could not build the copy bundle: ${e.message ?: e.javaClass.simpleName}",
+                            NotificationType.ERROR
+                        )
+                    }
+                }
+            }
+        })
+    }
+
+    private fun buildBundle(
+        basePath: String,
+        files: List<VirtualFile>,
+        indicator: ProgressIndicator
+    ): BundleResult {
+        val bundlePath = Files.createTempFile("copyforllm-", ".txt")
+        bundlePath.toFile().deleteOnExit()
+
+        var binaryCount = 0
+        var errorCount = 0
+
+        try {
+            Files.newBufferedWriter(bundlePath, StandardCharsets.UTF_8).use { writer ->
+                files.forEachIndexed { index, file ->
+                    indicator.checkCanceled()
+                    indicator.isIndeterminate = false
+                    indicator.fraction = index.toDouble() / files.size.toDouble()
+                    indicator.text2 = "Processing ${index + 1}/${files.size}: ${file.name}"
+
+                    val result = writeFile(basePath, file, writer, indicator)
+                    if (result == FileWriteResult.BINARY) binaryCount++
+                    if (result == FileWriteResult.ERROR) errorCount++
+                }
+            }
+
+            indicator.fraction = 1.0
+            indicator.text2 = "Preparing clipboard..."
+
+            return BundleResult(
+                path = bundlePath,
+                fileCount = files.size,
+                binaryCount = binaryCount,
+                errorCount = errorCount,
+                byteCount = Files.size(bundlePath)
             )
-            return
+        } catch (e: Exception) {
+            Files.deleteIfExists(bundlePath)
+            throw e
+        }
+    }
+
+    private fun writeFile(
+        basePath: String,
+        file: VirtualFile,
+        writer: BufferedWriter,
+        indicator: ProgressIndicator
+    ): FileWriteResult {
+        writer.append("===== ")
+        writer.append(relPath(basePath, file.path))
+        writer.appendLine(" =====")
+
+        if (!file.isValid) {
+            writer.appendLine("[file became unavailable before it could be copied]")
+            writer.newLine()
+            return FileWriteResult.ERROR
         }
 
-        CopyPasteManager.getInstance().setContents(StringSelection(result.text))
+        return try {
+            if (isBinary(file)) {
+                writer.appendLine("[binary file; Base64]")
+                writeBase64(file, writer, indicator)
+                writer.newLine()
+                writer.newLine()
+                FileWriteResult.BINARY
+            } else {
+                writeText(file, writer, indicator)
+                writer.newLine()
+                writer.newLine()
+                FileWriteResult.TEXT
+            }
+        } catch (e: ProcessCanceledException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn("Could not read file while copying for LLM: ${file.path}", e)
+            writer.newLine()
+            writer.append("[error reading file: ")
+            writer.append(e.message ?: e.javaClass.simpleName)
+            writer.appendLine("]")
+            writer.newLine()
+            FileWriteResult.ERROR
+        }
+    }
 
-        val skipped = if (result.skippedCount > 0) " ${formatSkipped(result)}" else ""
-        notify(
-            project,
-            "Copied ${result.copiedCount} file(s) to clipboard.$skipped",
-            NotificationType.INFORMATION
+    private fun isBinary(file: VirtualFile): Boolean {
+        val fileType = file.fileType
+        if (fileType.isBinary && fileType !== UnknownFileType.INSTANCE) return true
+        if (fileType !== UnknownFileType.INSTANCE) return false
+
+        file.inputStream.use { input ->
+            val sample = ByteArray(BINARY_SAMPLE_BYTES)
+            val count = input.read(sample)
+            if (count <= 0) return false
+
+            var suspiciousBytes = 0
+            for (index in 0 until count) {
+                val value = sample[index].toInt() and 0xFF
+                if (value == 0) return true
+                if (
+                    value in 0x01..0x08 ||
+                    value in 0x0B..0x0C ||
+                    value in 0x0E..0x1F ||
+                    value == 0x7F
+                ) {
+                    suspiciousBytes++
+                }
+            }
+
+            return suspiciousBytes * 20 >= count
+        }
+    }
+
+    private fun writeText(file: VirtualFile, writer: BufferedWriter, indicator: ProgressIndicator) {
+        InputStreamReader(file.inputStream, file.charset).use { reader ->
+            val buffer = CharArray(TEXT_BUFFER_CHARS)
+            while (true) {
+                indicator.checkCanceled()
+                val read = reader.read(buffer)
+                if (read < 0) return
+                writer.write(buffer, 0, read)
+            }
+        }
+    }
+
+    private fun writeBase64(file: VirtualFile, writer: BufferedWriter, indicator: ProgressIndicator) {
+        file.inputStream.use { input ->
+            val buffer = ByteArray(BASE64_CHUNK_BYTES)
+            while (true) {
+                indicator.checkCanceled()
+                val read = input.read(buffer)
+                if (read < 0) return
+                if (read == 0) continue
+
+                writer.appendLine(Base64.getEncoder().encodeToString(buffer.copyOf(read)))
+            }
+        }
+    }
+
+    private fun createClipboardPayload(bundle: BundleResult): ClipboardPayload {
+        if (bundle.byteCount <= INLINE_CLIPBOARD_BYTES) {
+            val text = Files.readString(bundle.path, StandardCharsets.UTF_8)
+            return ClipboardPayload(
+                transferable = StringSelection(text),
+                mode = ClipboardMode.TEXT,
+                afterCopied = { Files.deleteIfExists(bundle.path) }
+            )
+        }
+
+        return ClipboardPayload(
+            transferable = FileTransferable(bundle.path.toFile()),
+            mode = ClipboardMode.FILE,
+            afterCopied = {}
         )
     }
 
-    private fun buildClipboardContent(base: String, files: List<VirtualFile>): CopyBuildResult {
-        val output = StringBuilder()
-        var copiedCount = 0
-        var binarySkipped = 0
-        var oversizedSkipped = 0
-        var unreadableSkipped = 0
-        var budgetSkipped = 0
-
-        files.forEach { file ->
-            try {
-                if (!file.isValid) {
-                    unreadableSkipped++
-                    return@forEach
-                }
-
-                val fileType = file.fileType
-                if (fileType.isBinary && fileType !== UnknownFileType.INSTANCE) {
-                    binarySkipped++
-                    return@forEach
-                }
-
-                if (file.length > MAX_FILE_BYTES) {
-                    oversizedSkipped++
-                    return@forEach
-                }
-
-                val content = VfsUtilCore.loadText(file)
-                if (looksBinary(content)) {
-                    binarySkipped++
-                    return@forEach
-                }
-
-                val header = "===== ${relPath(base, file.path)} =====\n"
-                val requiredChars = header.length.toLong() + content.length.toLong() + 2L
-                val remainingChars = MAX_CLIPBOARD_CHARS.toLong() - output.length.toLong()
-                if (requiredChars > remainingChars) {
-                    budgetSkipped++
-                    return@forEach
-                }
-
-                output.append(header)
-                output.append(content)
-                output.append('\n')
-                output.append('\n')
-                copiedCount++
-            } catch (e: ProcessCanceledException) {
-                throw e
-            } catch (e: Exception) {
-                unreadableSkipped++
-                logger.warn("Skipping unreadable file while copying for LLM: ${file.path}", e)
-            }
+    private fun formatSuccess(bundle: BundleResult, payload: ClipboardPayload): String {
+        val binary = if (bundle.binaryCount > 0) {
+            " ${bundle.binaryCount} binary file(s) were included as Base64."
+        } else {
+            ""
+        }
+        val errors = if (bundle.errorCount > 0) {
+            " ${bundle.errorCount} unreadable file(s) are represented by error markers."
+        } else {
+            ""
         }
 
-        return CopyBuildResult(
-            text = output.toString(),
-            copiedCount = copiedCount,
-            binarySkipped = binarySkipped,
-            oversizedSkipped = oversizedSkipped,
-            unreadableSkipped = unreadableSkipped,
-            budgetSkipped = budgetSkipped
-        )
-    }
+        return when (payload.mode) {
+            ClipboardMode.TEXT ->
+                "Copied all ${bundle.fileCount} file(s) to the clipboard.$binary$errors"
 
-    private fun looksBinary(content: CharSequence): Boolean {
-        val sampleLength = minOf(content.length, BINARY_SAMPLE_CHARS)
-        if (sampleLength == 0) return false
-
-        var suspiciousChars = 0
-        for (index in 0 until sampleLength) {
-            val ch = content[index]
-            if (ch == '\u0000') return true
-
-            if (
-                ch == '\uFFFD' ||
-                (Character.isISOControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')
-            ) {
-                suspiciousChars++
-            }
+            ClipboardMode.FILE ->
+                "Copied all ${bundle.fileCount} file(s) as a ${formatMiB(bundle.byteCount)} MiB bundle file. " +
+                    "Paste or attach the file in the destination.$binary$errors"
         }
-
-        return suspiciousChars * 20 >= sampleLength
     }
 
-    private fun formatSkipped(result: CopyBuildResult): String {
-        val reasons = buildList {
-            if (result.binarySkipped > 0) add("${result.binarySkipped} binary")
-            if (result.oversizedSkipped > 0) add("${result.oversizedSkipped} over ${MAX_FILE_BYTES / MIB} MiB")
-            if (result.unreadableSkipped > 0) add("${result.unreadableSkipped} unreadable")
-            if (result.budgetSkipped > 0) add("${result.budgetSkipped} over the ${MAX_CLIPBOARD_CHARS / MIB}-MiB character budget")
-        }
-        return "Skipped ${result.skippedCount} file(s) (${reasons.joinToString()})."
-    }
+    private fun formatMiB(bytes: Long): String =
+        String.format("%.1f", bytes.toDouble() / MIB.toDouble())
 
     private fun relPath(base: String, full: String): String {
         if (base.isBlank()) return full
@@ -169,22 +272,48 @@ class CopyForLLMAction : DumbAwareAction(
             .notify(project)
     }
 
-    private data class CopyBuildResult(
-        val text: String,
-        val copiedCount: Int,
-        val binarySkipped: Int,
-        val oversizedSkipped: Int,
-        val unreadableSkipped: Int,
-        val budgetSkipped: Int
-    ) {
-        val skippedCount: Int
-            get() = binarySkipped + oversizedSkipped + unreadableSkipped + budgetSkipped
+    private data class BundleResult(
+        val path: Path,
+        val fileCount: Int,
+        val binaryCount: Int,
+        val errorCount: Int,
+        val byteCount: Long
+    )
+
+    private data class ClipboardPayload(
+        val transferable: Transferable,
+        val mode: ClipboardMode,
+        val afterCopied: () -> Unit
+    )
+
+    private enum class ClipboardMode {
+        TEXT,
+        FILE
+    }
+
+    private enum class FileWriteResult {
+        TEXT,
+        BINARY,
+        ERROR
+    }
+
+    private class FileTransferable(private val file: File) : Transferable {
+        override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.javaFileListFlavor)
+
+        override fun isDataFlavorSupported(flavor: DataFlavor): Boolean =
+            flavor == DataFlavor.javaFileListFlavor
+
+        override fun getTransferData(flavor: DataFlavor): Any {
+            if (!isDataFlavorSupported(flavor)) throw UnsupportedFlavorException(flavor)
+            return listOf(file)
+        }
     }
 
     companion object {
-        private const val MIB = 1024 * 1024
-        private const val MAX_FILE_BYTES = 4L * MIB
-        private const val MAX_CLIPBOARD_CHARS = 8 * MIB
-        private const val BINARY_SAMPLE_CHARS = 8192
+        private const val MIB = 1024L * 1024L
+        private const val INLINE_CLIPBOARD_BYTES = 16L * MIB
+        private const val BINARY_SAMPLE_BYTES = 8192
+        private const val TEXT_BUFFER_CHARS = 8192
+        private const val BASE64_CHUNK_BYTES = 24 * 1024
     }
 }
