@@ -91,6 +91,7 @@ class CopyForLLMAction : DumbAwareAction(
 
         var binaryCount = 0
         var errorCount = 0
+        val largestSourceTypes = findLargestSourceTypes(files)
 
         try {
             Files.newBufferedWriter(bundlePath, StandardCharsets.UTF_8).use { writer ->
@@ -114,12 +115,37 @@ class CopyForLLMAction : DumbAwareAction(
                 fileCount = files.size,
                 binaryCount = binaryCount,
                 errorCount = errorCount,
-                byteCount = Files.size(bundlePath)
+                byteCount = Files.size(bundlePath),
+                largestSourceTypes = largestSourceTypes
             )
         } catch (e: Exception) {
             Files.deleteIfExists(bundlePath)
             throw e
         }
+    }
+
+    private fun findLargestSourceTypes(files: List<VirtualFile>): List<SourceTypeStats> {
+        val totals = HashMap<String, MutableSourceTypeStats>()
+
+        for (file in files) {
+            if (!file.isValid) continue
+
+            val label = file.extension
+                ?.takeIf { it.isNotBlank() }
+                ?.lowercase()
+                ?.let { ".$it" }
+                ?: "(no extension)"
+            val stats = totals.getOrPut(label) { MutableSourceTypeStats() }
+            stats.byteCount += file.length.coerceAtLeast(0L)
+            stats.fileCount++
+        }
+
+        return totals.entries
+            .sortedByDescending { it.value.byteCount }
+            .take(MAX_LARGEST_SOURCE_TYPES)
+            .map { (label, stats) ->
+                SourceTypeStats(label, stats.byteCount, stats.fileCount)
+            }
     }
 
     private fun writeFile(
@@ -246,15 +272,28 @@ class CopyForLLMAction : DumbAwareAction(
         } else {
             ""
         }
+        val largestTypes = if (bundle.largestSourceTypes.isNotEmpty()) {
+            " Largest source types: " + bundle.largestSourceTypes.joinToString(", ") { stats ->
+                "${stats.label} ${formatSize(stats.byteCount)} (${stats.fileCount})"
+            }
+        } else {
+            ""
+        }
 
         return when (payload.mode) {
             ClipboardMode.TEXT ->
-                "Copied all ${bundle.fileCount} file(s) to the clipboard.$binary$errors"
+                "Copied all ${bundle.fileCount} file(s) to the clipboard.$binary$errors$largestTypes"
 
             ClipboardMode.FILE ->
                 "Copied all ${bundle.fileCount} file(s) as a ${formatMiB(bundle.byteCount)} MiB bundle file. " +
-                    "Paste or attach the file in the destination.$binary$errors"
+                    "Paste or attach the file in the destination.$binary$errors$largestTypes"
         }
+    }
+
+    private fun formatSize(bytes: Long): String = when {
+        bytes >= MIB -> "${formatMiB(bytes)} MiB"
+        bytes >= KIB -> String.format("%.1f KiB", bytes.toDouble() / KIB.toDouble())
+        else -> "$bytes B"
     }
 
     private fun formatMiB(bytes: Long): String =
@@ -277,7 +316,19 @@ class CopyForLLMAction : DumbAwareAction(
         val fileCount: Int,
         val binaryCount: Int,
         val errorCount: Int,
-        val byteCount: Long
+        val byteCount: Long,
+        val largestSourceTypes: List<SourceTypeStats>
+    )
+
+    private data class SourceTypeStats(
+        val label: String,
+        val byteCount: Long,
+        val fileCount: Int
+    )
+
+    private class MutableSourceTypeStats(
+        var byteCount: Long = 0,
+        var fileCount: Int = 0
     )
 
     private data class ClipboardPayload(
@@ -310,10 +361,12 @@ class CopyForLLMAction : DumbAwareAction(
     }
 
     companion object {
-        private const val MIB = 1024L * 1024L
+        private const val KIB = 1024L
+        private const val MIB = 1024L * KIB
         private const val INLINE_CLIPBOARD_BYTES = 16L * MIB
         private const val BINARY_SAMPLE_BYTES = 8192
         private const val TEXT_BUFFER_CHARS = 8192
         private const val BASE64_CHUNK_BYTES = 24 * 1024
+        private const val MAX_LARGEST_SOURCE_TYPES = 10
     }
 }
