@@ -61,19 +61,39 @@ object FileCollector {
     /** Apply include/exclude logic from settings. */
     fun filterBySettings(settings: CopyForLLMSettings, files: List<VirtualFile>): List<VirtualFile> {
         val includeMode = settings.isIncludeMode()
-        val inc = settings.toRegexes(settings.normalizedInclude())
-        val exc = settings.toRegexes(settings.normalizedExclude())
+        val includePatterns = settings.normalizedInclude()
+        val excludePatterns = settings.normalizedExclude()
+        val includeNoExtension = includePatterns.hasNoExtensionToken()
+        val excludeNoExtension = excludePatterns.hasNoExtensionToken()
+        val inc = settings.toRegexes(includePatterns.withoutNoExtensionToken())
+        val exc = settings.toRegexes(excludePatterns.withoutNoExtensionToken())
 
-        // Be generous: empty include list in include mode => include all (then apply exclude)
-        val includeAllIfEmpty = includeMode && inc.isEmpty()
+        // Be generous: empty include list in include mode => include all (then apply exclude).
+        // A lone "(no extension)" token is not an empty include list.
+        val includeAllIfEmpty = includeMode && inc.isEmpty() && !includeNoExtension
 
         return files.filter { vf ->
             if (!vf.isValid || vf.isDirectory) return@filter false
+
+            val hasNoExtension = vf.extension.isNullOrEmpty()
             val name = vf.name
-            val inInclude = if (includeAllIfEmpty) true else settings.matchesAny(name, inc)
-            val inExclude = settings.matchesAny(name, exc)
+            val inInclude = if (includeAllIfEmpty) {
+                true
+            } else {
+                (includeNoExtension && hasNoExtension) || settings.matchesAny(name, inc)
+            }
+            val inExclude =
+                (excludeNoExtension && hasNoExtension) || settings.matchesAny(name, exc)
 
             if (includeMode) (inInclude && !inExclude) else (!inExclude)
         }
     }
+
+    private fun List<String>.hasNoExtensionToken(): Boolean =
+        any { it.equals(NO_EXTENSION_TOKEN, ignoreCase = true) }
+
+    private fun List<String>.withoutNoExtensionToken(): List<String> =
+        filterNot { it.equals(NO_EXTENSION_TOKEN, ignoreCase = true) }
+
+    private const val NO_EXTENSION_TOKEN = "(no extension)"
 }
