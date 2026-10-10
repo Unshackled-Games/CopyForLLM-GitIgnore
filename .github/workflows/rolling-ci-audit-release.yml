@@ -28,6 +28,11 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Check out repository content for read-only hash and policy audit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
       - name: Audit CI evidence policy without executing repository code
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,6 +50,34 @@ jobs:
           echo "AUDIT_UNITY_EDITOR_ROOT=C:\\Program Files\\Unity\\Hub\\Editor"
           echo "AUDIT_UNITY_AUTO_INSTALL=forbidden"
           gh api "repos/$GITHUB_REPOSITORY" --jq '"REPO_VISIBILITY=\(.visibility) DEFAULT_BRANCH=\(.default_branch)"'
+          # Do not execute project code or dump potentially private package source URLs.
+          # Only emit source-file SHA-256 and workflow policy counts to sealed CI logs.
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          files = (
+              "ProjectSettings/ProjectVersion.txt", "Packages/manifest.json",
+              "Packages/packages-lock.json", "package.json", "global.json",
+              "pyproject.toml", "Cargo.toml", "gradle.properties"
+          )
+          for name in files:
+              p = Path(name)
+              if p.is_file():
+                  digest = hashlib.sha256(p.read_bytes()).hexdigest()
+                  print(f"AUDIT_SOURCE_FILE name={name} sha256={digest}")
+          wfs = sorted(Path(".github/workflows").glob("*.yml")) + sorted(
+              Path(".github/workflows").glob("*.yaml"))
+          uploads = 0
+          auto_install_mentions = 0
+          for wf in wfs:
+              text = wf.read_text(encoding="utf-8", errors="replace")
+              uploads += text.count("actions/upload-artifact@")
+              auto_install_mentions += text.count("--allow-install")
+              auto_install_mentions += text.count("editors install ")
+          print(f"AUDIT_WORKFLOW_COUNT count={len(wfs)}")
+          print(f"AUDIT_LEGACY_ARTIFACT_UPLOAD_STEPS count={uploads}")
+          print(f"AUDIT_UNITY_AUTO_INSTALL_FLAG_MENTIONS count={auto_install_mentions}")
+          PY
           echo "AUDIT_EXECUTED_PROJECT_CODE=false"
           echo "AUDIT_FINISHED=true"
 
