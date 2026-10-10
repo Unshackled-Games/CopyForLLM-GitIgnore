@@ -1,0 +1,157 @@
+# Organization CI evidence policy: rolling GitHub Release assets only.
+# No actions/upload-artifact, no downloaded build artifacts, no checkout in
+# the privileged publisher. The publisher does NOT execute source code.
+name: Rolling CI Audit Release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10 17 * * *'
+  workflow_run:
+    workflows: ["Build IntelliJ Plugin"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+# One publisher per repository updates the same fixed-size release assets.
+concurrency:
+  group: rolling-ci-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: ${{ github.event_name != 'workflow_run' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out repository content for read-only hash and policy audit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Audit CI evidence policy without executing repository code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "AUDIT_REPOSITORY=$GITHUB_REPOSITORY"
+          echo "AUDIT_RUN_ID=$GITHUB_RUN_ID"
+          echo "AUDIT_RELEASE_TAG=ci-audit-rolling"
+          echo "AUDIT_STORE=GitHub-Releases-only"
+          echo "AUDIT_UNITY_RUNNER_GROUP=unity-windows-pool"
+          echo "AUDIT_UNITY_RUNNER_LABEL=unity-windows"
+          echo "AUDIT_UNITY_RUNNER_POOL_TARGET=5"
+          echo "AUDIT_UNITY_GATE_CAPACITY_OBSERVED=4"
+          echo "AUDIT_UNITY_EDITOR_ROOT=C:\\Program Files\\Unity\\Hub\\Editor"
+          echo "AUDIT_UNITY_AUTO_INSTALL=forbidden"
+          gh api "repos/$GITHUB_REPOSITORY" --jq '"REPO_VISIBILITY=\(.visibility) DEFAULT_BRANCH=\(.default_branch)"'
+          # Do not execute project code or dump potentially private package source URLs.
+          # Only emit source-file SHA-256 and workflow policy counts to sealed CI logs.
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          files = (
+              "ProjectSettings/ProjectVersion.txt", "Packages/manifest.json",
+              "Packages/packages-lock.json", "package.json", "global.json",
+              "pyproject.toml", "Cargo.toml", "gradle.properties"
+          )
+          for name in files:
+              p = Path(name)
+              if p.is_file():
+                  digest = hashlib.sha256(p.read_bytes()).hexdigest()
+                  print(f"AUDIT_SOURCE_FILE name={name} sha256={digest}")
+          wfs = sorted(Path(".github/workflows").glob("*.yml")) + sorted(
+              Path(".github/workflows").glob("*.yaml"))
+          uploads = 0
+          auto_install_mentions = 0
+          for wf in wfs:
+              text = wf.read_text(encoding="utf-8", errors="replace")
+              uploads += text.count("actions/upload-artifact@")
+              auto_install_mentions += text.count("--allow-install")
+              auto_install_mentions += text.count("editors install ")
+          print(f"AUDIT_WORKFLOW_COUNT count={len(wfs)}")
+          print(f"AUDIT_LEGACY_ARTIFACT_UPLOAD_STEPS count={uploads}")
+          print(f"AUDIT_UNITY_AUTO_INSTALL_FLAG_MENTIONS count={auto_install_mentions}")
+          PY
+          echo "AUDIT_EXECUTED_PROJECT_CODE=false"
+          echo "AUDIT_FINISHED=true"
+
+  publish:
+    if: ${{ always() && (github.event_name != 'workflow_run' || github.event.workflow_run.event != 'pull_request') }}
+    needs: [audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AUDIT_SOURCE_RUN_ID: ${{ github.run_id }}
+      COMPLETED_CI_RUN_ID: ${{ github.event.workflow_run.id }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Seal latest logs and audit into bounded rolling GitHub Release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p evidence
+          cd evidence
+          tag=ci-audit-rolling
+          if ! gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" \
+              --target "$DEFAULT_BRANCH" --prerelease \
+              --title "Rolling CI logs and audits" \
+              --notes "Machine-readable rolling audit and CI logs; SHA-256 sealed. Assets are replaced rather than accumulated. No GitHub Actions artifact storage."
+          fi
+
+          publish_one() {
+            local kind="$1" run_id="$2"
+            [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "::error::Invalid run id"; exit 1; }
+            local zip="${kind}-latest.zip"
+            local json="${kind}-latest.json"
+            local sha="${kind}-latest.sha256"
+            # GitHub Actions run-log REST endpoint; follows its signed redirect.
+            # No upload/download-artifact actions or untrusted source checkout.
+            curl --fail-with-body -sSL --retry 3 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/logs" \
+              -o "$zip"
+            unzip -t "$zip" >/dev/null
+            sha256sum "$zip" > "$sha"
+            local run_data
+            run_data="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+            jq -n --arg kind "$kind" --arg repo "$GITHUB_REPOSITORY" \
+              --arg asset "$zip" --arg hash "$(cut -d' ' -f1 "$sha")" \
+              --argjson run "$run_data" \
+              '{schemaVersion:1, repository:$repo, kind:$kind,
+                sourceRunId:$run.id, sourceSha:$run.head_sha,
+                sourceEvent:$run.event, sourceStatus:$run.status,
+                sourceConclusion:$run.conclusion, archive:$asset,
+                archiveSha256:$hash, storedIn:"GitHubRelease",
+                workflowArtifactsUsed:false}' > "$json"
+            gh release upload "$tag" "$zip" "$json" "$sha" --clobber -R "$GITHUB_REPOSITORY"
+            echo "RELEASE_LOGS_VERIFIED kind=$kind run=$run_id sha256=$(cut -d' ' -f1 "$sha") tag=$tag"
+          }
+
+          if [[ "$GITHUB_EVENT_NAME" == workflow_run ]]; then
+            publish_one ci-logs "$COMPLETED_CI_RUN_ID"
+          else
+            # A weekly/manual run produces its own completed AUDIT job log.
+            publish_one audit "$AUDIT_SOURCE_RUN_ID"
+            # Also refresh the last completed trusted CI run, if any.
+            latest="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" \
+              --jq '[.workflow_runs[] | select(.name != "Rolling CI Audit Release" and .status == "completed" and .event != "pull_request")][0].id // empty')"
+            if [[ "$latest" =~ ^[0-9]+$ ]]; then
+              publish_one ci-logs "$latest"
+            else
+              echo "RELEASE_CI_LOGS_SKIPPED reason=no_completed_non_pr_ci_run"
+            fi
+          fi
+          echo "RELEASE_EVIDENCE_COMPLETE repo=$GITHUB_REPOSITORY tag=$tag"
