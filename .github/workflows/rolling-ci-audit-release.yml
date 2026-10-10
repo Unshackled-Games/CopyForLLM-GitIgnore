@@ -85,7 +85,7 @@ jobs:
             local sha="${kind}-latest.sha256"
             # GitHub Actions run-log REST endpoint; follows its signed redirect.
             # No upload/download-artifact actions or untrusted source checkout.
-            curl --fail-with-body -fsSL --retry 3 \
+            curl --fail-with-body -sSL --retry 3 \
               -H "Authorization: Bearer $GH_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/logs" \
